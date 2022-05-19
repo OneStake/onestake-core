@@ -7,8 +7,8 @@ import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 
-import "../utils/Helpers.sol";
-import "../utils/StableMath.sol";
+import "../libraries/Helpers.sol";
+import "../libraries/StableMath.sol";
 
 /**
  * @title IUSD vault contract
