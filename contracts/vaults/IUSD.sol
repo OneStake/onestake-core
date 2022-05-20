@@ -45,7 +45,7 @@ contract IUSD is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
 
         uint256 assetDecimals = Helpers.getDecimals(_asset);
         require((shares = previewDeposit(_amount.scaleBy(18, assetDecimals))) != 0, "ZERO_SHARES");
-
+        console.log("shares %s", shares);
         if(IERC20Upgradeable(_asset).balanceOf(address(this)) == 0) allAssets.push(_asset);
 
         IERC20Upgradeable(_asset).transferFrom(msg.sender, address(this), _amount);
@@ -55,9 +55,23 @@ contract IUSD is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
         emit Deposit(msg.sender, _asset, _amount, shares);
     }
 
+    function withdraw(
+        uint256 _shares
+    ) external nonReentrant {
+        require(_shares > 0, "shares must be greater than 0");
+    }
+
     function convertToShares(uint256 _amount) internal view returns (uint256) {
         uint256 supply = totalSupply();
+        console.log("supply %s", supply);
+        console.log("totalAssets %s", totalAssets());
         return supply == 0 ? _amount : _amount.mul(supply).div(totalAssets());
+    }
+
+    function convertToAssets(uint256 _shares) internal view returns (uint256) {
+        uint256 supply = totalSupply(); // Saves an extra SLOAD if totalSupply is non-zero.
+
+        return supply == 0 ? _shares : _shares.mul(totalAssets()).div(supply);
     }
 
     function totalAssets() internal view returns (uint256 totalBalance) {
@@ -70,10 +84,13 @@ contract IUSD is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
         }
     }
 
-    function previewDeposit(uint256 _amount) internal view returns (uint256) {
+    function previewDeposit(uint256 _amount) public view returns (uint256) {
         return convertToShares(_amount);
     }
 
+    function previewRedeem(uint256 _shares) public view returns (uint256) {
+        return convertToAssets(_shares);
+    }
     /**
      * @dev Add a supported asset to the contract, i.e. one that can be to mint iUSD.
      * @param _asset Address of asset

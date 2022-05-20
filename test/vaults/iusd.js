@@ -5,13 +5,13 @@ const { parseEther, parseUnits } = ethers.utils;
 
 describe("iUSD Vault contract", function () {
     let iusd;
-    let mockDAI, mockUSDT;
-    let deployer, tokenOwner, user1, user2;
+    let mockDAI, mockUSDT, mockUSDC;
+    let deployer, tokenOwner, user1, user2, user3;
 
     const approvalAmount = parseUnits("100000000", 18);
 
     before(async () => {
-        [deployer, tokenOwner, user1, user2] = await ethers.getSigners();
+        [deployer, tokenOwner, user1, user2, user3] = await ethers.getSigners();
         const IUSD = await ethers.getContractFactory("IUSD");
         iusd = await upgrades.deployProxy(IUSD, ["iUSD Token", "iUSD"]);
         await iusd.deployed();
@@ -24,8 +24,13 @@ describe("iUSD Vault contract", function () {
         mockUSDT = await MockUSDT.deploy();
         await mockUSDT.deployed();
 
+        const MockUSDC = await ethers.getContractFactory("MockUSDT");
+        mockUSDC = await MockUSDC.deploy();
+        await mockUSDC.deployed();
+
         await mockDAI.connect(user1).mint(parseUnits("1000", 18));
         await mockUSDT.connect(user2).mint(parseUnits("1000", 6));
+        await mockUSDC.connect(user3).mint(parseUnits("1000", 6));
     });
 
     describe("Initialize", () => {
@@ -81,6 +86,20 @@ describe("iUSD Vault contract", function () {
 
             expect(await iusd.getAssetCount()).to.be.equal("2");
             expect(await mockUSDT.balanceOf(iusd.address)).to.be.equal(parseUnits("200", 6));
+        });
+
+        it("User3 deposits successfully", async () => {
+            await iusd.supportAsset(mockUSDC.address);
+            await mockUSDC
+                .connect(user3)
+                .approve(iusd.address, approvalAmount);
+
+            await iusd
+                .connect(user3)
+                .deposit(mockUSDC.address, parseUnits("150", 6));
+
+            expect(await iusd.getAssetCount()).to.be.equal("3");
+            expect(await mockUSDC.balanceOf(iusd.address)).to.be.equal(parseUnits("150", 6));
         });
     });
 });
