@@ -46,7 +46,7 @@ contract IUSD is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
 
         uint256 assetDecimals = Helpers.getDecimals(_asset);
         require((shares = previewDeposit(_amount.scaleBy(18, assetDecimals))) != 0, "ZERO_SHARES");
-        console.log("shares %s", shares);
+        
         if(IERC20Upgradeable(_asset).balanceOf(address(this)) == 0) allAssets.push(_asset);
 
         IERC20Upgradeable(_asset).transferFrom(msg.sender, address(this), _amount);
@@ -63,7 +63,36 @@ contract IUSD is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
 
         require((amount = previewWithdraw(_shares)) != 0, "ZERO_AMOUNT");
 
+        // Calculate redemption outputs
+        (
+            uint256[] memory outputs,
+        ) = _calculateRedeemOutputs(amount);
+
         _burn(msg.sender, _shares);
+
+        // Send outputs
+        for (uint256 i = 0; i < allAssets.length; i++) {
+            if (outputs[i] == 0) continue;
+
+            IERC20Upgradeable asset = IERC20Upgradeable(allAssets[i]);
+
+            if (asset.balanceOf(address(this)) >= outputs[i]) {
+                // Use Vault funds first if sufficient
+                asset.transfer(msg.sender, outputs[i]);
+            } else {
+                // todo: related to Strategies
+                /* address strategyAddr = assetDefaultStrategies[allAssets[i]];
+                if (strategyAddr != address(0)) {
+                    // Nothing in Vault, but something in Strategy, send from there
+                    IStrategy strategy = IStrategy(strategyAddr);
+                    strategy.withdraw(msg.sender, allAssets[i], outputs[i]);
+                } else {
+                    // Cant find funds anywhere
+                    revert("Liquidity error");
+                } */
+                revert("Liquidity error");
+            }
+        }
 
         emit Withdraw(msg.sender, _shares, amount);
     }
@@ -116,6 +145,7 @@ contract IUSD is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
     {
         IERC20Upgradeable asset = IERC20Upgradeable(_asset);
         balance = asset.balanceOf(address(this));
+        // todo: related to Strategies
         /* for (uint256 i = 0; i < allStrategies.length; i++) {
             IStrategy strategy = IStrategy(allStrategies[i]);
             if (strategy.supportsAsset(_asset)) {
@@ -126,8 +156,6 @@ contract IUSD is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
 
     function convertToShares(uint256 _amount) internal view returns (uint256) {
         uint256 supply = totalSupply();
-        console.log("supply %s", supply);
-        console.log("totalAssets %s", totalAssets());
         return supply == 0 ? _amount : _amount.mul(supply).div(totalAssets());
     }
 
