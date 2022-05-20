@@ -27,7 +27,8 @@ contract IUSD is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
     
     event AssetSupported(address indexed _asset);
     event Deposit(address indexed _user, address indexed _asset, uint256 _amount, uint256 _shares);
-    
+    event Withdraw(address indexed _user, uint256 _share, uint256 _amount);
+
     function initialize(
         string calldata _iTokenName,
         string calldata _iTokenSymbol
@@ -57,8 +58,70 @@ contract IUSD is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
 
     function withdraw(
         uint256 _shares
-    ) external nonReentrant {
+    ) external nonReentrant returns (uint256 amount) {
         require(_shares > 0, "shares must be greater than 0");
+
+        require((amount = previewWithdraw(_shares)) != 0, "ZERO_AMOUNT");
+
+        _burn(msg.sender, _shares);
+
+        emit Withdraw(msg.sender, _shares, amount);
+    }
+
+    function _calculateRedeemOutputs(uint256 _amount)
+        internal
+        view
+        returns (uint256[] memory outputs, uint256 totalBalance)
+    {
+        uint256 assetCount = getAssetCount();
+        uint256[] memory assetBalances = new uint256[](assetCount);
+        uint256[] memory assetDecimals = new uint256[](assetCount);
+        uint256 totalOutputRatio = 0;
+        outputs = new uint256[](assetCount);
+
+        // Calculate assets balances and decimals once,
+        for (uint256 i = 0; i < allAssets.length; i++) {
+            uint256 balance = _checkBalance(allAssets[i]);
+            uint256 decimals = Helpers.getDecimals(allAssets[i]);
+            assetBalances[i] = balance;
+            assetDecimals[i] = decimals;
+            totalBalance = totalBalance.add(balance.scaleBy(18, decimals));
+        }
+
+        // Calculate totalOutputRatio
+        for (uint256 i = 0; i < allAssets.length; i++) {
+            uint256 ratio = assetBalances[i]
+                .scaleBy(18, assetDecimals[i])
+                .mul(1e18)
+                .div(totalBalance);
+            totalOutputRatio = totalOutputRatio.add(ratio);
+        }
+        // Calculate final outputs
+        uint256 factor = _amount.divPrecisely(totalOutputRatio);
+        for (uint256 i = 0; i < allAssets.length; i++) {
+            outputs[i] = assetBalances[i].mul(factor).div(totalBalance);
+        }
+    }
+
+    /**
+     * @notice Get the balance of an asset held in Vault and all strategies.
+     * @param _asset Address of asset
+     * @return balance Balance of asset in decimals of asset
+     */
+    function _checkBalance(address _asset)
+        internal
+        view
+        virtual
+        returns (uint256 balance)
+    {
+        IERC20Upgradeable asset = IERC20Upgradeable(_asset);
+        balance = asset.balanceOf(address(this));
+        /* for (uint256 i = 0; i < allStrategies.length; i++) {
+            IStrategy strategy = IStrategy(allStrategies[i]);
+            if (strategy.supportsAsset(_asset)) {
+                balance = balance.add(strategy.checkBalance(_asset));
+            }
+        } */
     }
 
     function convertToShares(uint256 _amount) internal view returns (uint256) {
@@ -88,7 +151,7 @@ contract IUSD is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
         return convertToShares(_amount);
     }
 
-    function previewRedeem(uint256 _shares) public view returns (uint256) {
+    function previewWithdraw(uint256 _shares) public view returns (uint256) {
         return convertToAssets(_shares);
     }
     /**
