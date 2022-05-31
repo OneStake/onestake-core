@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 /**
  * @title Curve 3Pool Strategy
  * @notice Investment strategy for investing stablecoins via Curve 3Pool
- * @author Origin Protocol Inc
+ * @author OneStake Finance
  */
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
