@@ -1,5 +1,6 @@
+const hre = require("hardhat");
 const { ethers, upgrades } = require("hardhat");
-const { parseUnits } = ethers.utils;
+const { parseUnits, formatUnits } = ethers.utils;
 
 // iUSD Vault
 const IUSD = await ethers.getContractFactory("IUSD");
@@ -26,6 +27,39 @@ for (const user of [user1, user2, user3]) {
     await iUSD.connect(user).mint(mockDAI.address, parseUnits("100", 18));
 }
 
+function usdtUnits(amount) {
+    return parseUnits(amount, 6);
+}
+
+function usdtUnitsFormat(amount) {
+    return formatUnits(amount, 6);
+}
+
+function usdcUnits(amount) {
+    return parseUnits(amount, 6);
+}
+
+function usdcUnitsFormat(amount) {
+    return formatUnits(amount, 6);
+}
+
+function daiUnits(amount) {
+    return parseUnits(amount, 18);
+}
+
+function daiUnitsFormat(amount) {
+    return formatUnits(amount, 18);
+}
+
+const advanceTime = async (seconds) => {
+    await hre.ethers.provider.send("evm_increaseTime", [seconds]);
+    await hre.ethers.provider.send("evm_mine");
+};
+
+const getBlockTimestamp = async () => {
+    return (await hre.ethers.provider.getBlock("latest")).timestamp;
+};
+
 module.exports = {
     mockDAI,
     mockUSDC,
@@ -33,5 +67,13 @@ module.exports = {
     user1,
     user2,
     user3,
+    usdtUnits,
+    usdtUnitsFormat,
+    usdcUnits,
+    usdcUnitsFormat,
+    daiUnits,
+    daiUnitsFormat,
+    advanceTime,
+    getBlockTimestamp,
     iUSD
 };
