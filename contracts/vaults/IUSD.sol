@@ -7,6 +7,7 @@ import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 
+import "../interfaces/IController.sol";
 import "../libraries/Helpers.sol";
 import "../libraries/StableMath.sol";
 
@@ -24,17 +25,20 @@ contract IUSD is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
     /// @notice Stablecoins supported by the IUSD Vault
     mapping(address => bool) internal isSupportedAsset;
     address[] internal allAssets;
-    
+    IController public controller;
+
     event AssetSupported(address indexed _asset);
     event Deposit(address indexed _user, address indexed _asset, uint256 _amount, uint256 _shares);
     event Withdraw(address indexed _user, uint256 _share, uint256 _amount);
 
     function initialize(
         string calldata _iTokenName,
-        string calldata _iTokenSymbol
+        string calldata _iTokenSymbol,
+        address _controller
     ) external initializer {
         __ERC20_init(_iTokenName, _iTokenSymbol);
         __ReentrancyGuard_init();
+        controller = IController(_controller);
     }
 
     function deposit(
@@ -49,7 +53,8 @@ contract IUSD is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
         
         if(IERC20Upgradeable(_asset).balanceOf(address(this)) == 0) allAssets.push(_asset);
 
-        IERC20Upgradeable(_asset).transferFrom(msg.sender, address(this), _amount);
+        // deposit user funds to the controller
+        controller.depositUSD(msg.sender, _asset, _amount);
 
         _mint(msg.sender, shares);
 
