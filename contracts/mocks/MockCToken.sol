@@ -11,8 +11,7 @@ contract MockCToken is ICERC20, ERC20 {
 
     IERC20 public underlyingToken;
     // underlying = cToken * exchangeRate
-    // cToken = underlying / exchangeRate
-    uint256 exchangeRate;
+    uint256 public exchangeRate;
     address public override comptroller;
 
     constructor(ERC20 _underlyingToken, address _comptroller)
