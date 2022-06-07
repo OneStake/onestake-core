@@ -2,11 +2,6 @@ const hre = require("hardhat");
 const { ethers, upgrades } = require("hardhat");
 const { parseUnits, formatUnits } = ethers.utils;
 
-// iUSD Vault
-const IUSD = await ethers.getContractFactory("IUSD");
-const iUSD = await upgrades.deployProxy(IUSD, ["iUSD", "iUSD"]);
-await iUSD.deployed();
-
 const MockDAI = await ethers.getContractFactory("MockDAI");
 const mockDAI = await MockDAI.deploy();
 
@@ -15,6 +10,15 @@ const mockUSDC = await MockUSDC.deploy();
 
 const MockUSDT = await ethers.getContractFactory("MockUSDT");
 const mockUSDT = await MockUSDT.deploy();
+
+const Controller = await ethers.getContractFactory("Controller");
+const controller = await upgrades.deployProxy(Controller, []);
+await controller.deployed();
+
+// iUSD Vault
+const IUSD = await ethers.getContractFactory("IUSD");
+const iUSD = await upgrades.deployProxy(IUSD, ["iUSD", "iUSD", controller.address]);
+await iUSD.deployed();
 
 const signers = await ethers.getSigners();
 
@@ -75,5 +79,6 @@ module.exports = {
     daiUnitsFormat,
     advanceTime,
     getBlockTimestamp,
-    iUSD
+    iUSD,
+    controller
 };
