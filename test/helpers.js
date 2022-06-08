@@ -1,35 +1,6 @@
 const hre = require("hardhat");
-const { ethers, upgrades } = require("hardhat");
+const { ethers } = require("hardhat");
 const { parseUnits, formatUnits } = ethers.utils;
-
-const MockDAI = await ethers.getContractFactory("MockDAI");
-const mockDAI = await MockDAI.deploy();
-
-const MockUSDC = await ethers.getContractFactory("MockUSDC");
-const mockUSDC = await MockUSDC.deploy();
-
-const MockUSDT = await ethers.getContractFactory("MockUSDT");
-const mockUSDT = await MockUSDT.deploy();
-
-const Controller = await ethers.getContractFactory("Controller");
-const controller = await upgrades.deployProxy(Controller, []);
-await controller.deployed();
-
-// iUSD Vault
-const IUSD = await ethers.getContractFactory("IUSD");
-const iUSD = await upgrades.deployProxy(IUSD, ["iUSD", "iUSD", controller.address]);
-await iUSD.deployed();
-
-const signers = await ethers.getSigners();
-
-const user1 = signers[1];
-const user2 = signers[2];
-const user3 = signers[3];
-
-for (const user of [user1, user2, user3]) {
-    await mockDAI.connect(user).approve(iUSD.address, parseUnits("100", 18));
-    await iUSD.connect(user).mint(mockDAI.address, parseUnits("100", 18));
-}
 
 function usdtUnits(amount) {
     return parseUnits(amount, 6);
@@ -65,12 +36,7 @@ const getBlockTimestamp = async () => {
 };
 
 module.exports = {
-    mockDAI,
-    mockUSDC,
-    mockUSDT,
-    user1,
-    user2,
-    user3,
+    parseUnits,
     usdtUnits,
     usdtUnitsFormat,
     usdcUnits,
@@ -78,7 +44,5 @@ module.exports = {
     daiUnits,
     daiUnitsFormat,
     advanceTime,
-    getBlockTimestamp,
-    iUSD,
-    controller
+    getBlockTimestamp
 };
