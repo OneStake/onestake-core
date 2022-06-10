@@ -6,5 +6,5 @@ interface IPriceOracle {
 
     function updateOracle(address _token, address _oracle) external;
 
-    function getPrice(address _token) external view returns (int256, uint8);
+    function getPrice(address _token) external view returns (uint256, uint8);
 }

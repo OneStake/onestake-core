@@ -40,13 +40,13 @@ contract PriceOracle is Ownable {
      @dev return current price or if oracle is not registered returns 0
      @param _token ERC20 token address
      */
-    function getPrice(address _token) external view returns (int256, uint8) {
+    function getPrice(address _token) external view returns (uint256, uint8) {
         if (oracles[_token] == address(0)) {
             return (0, 0);
         }
 
         AggregatorV3Interface oracle = AggregatorV3Interface(oracles[_token]);
         (, int256 answer, , , ) = oracle.latestRoundData();
-        return (answer, oracle.decimals());
+        return (uint256(answer), oracle.decimals());
     }
 }
