@@ -8,6 +8,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 
 import "../interfaces/IController.sol";
+import "../interfaces/IPriceOracle.sol";
 import "../libraries/Helpers.sol";
 import "../libraries/StableMath.sol";
 
@@ -23,9 +24,12 @@ contract IUSD is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
     using SafeMathUpgradeable for uint256;
 
     /// @notice Stablecoins supported by the IUSD Vault
-    mapping(address => bool) internal isSupportedAsset;
+    // mapping(address => bool) internal isSupportedAsset;
     address[] internal allAssets;
+    address[] internal allStrategies;
+
     IController public controller;
+    IPriceOracle public priceOracle;
 
     event AssetSupported(address indexed _asset);
     event Deposit(address indexed _user, address indexed _asset, uint256 _amount, uint256 _shares);
@@ -34,27 +38,29 @@ contract IUSD is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
     function initialize(
         string calldata _iTokenName,
         string calldata _iTokenSymbol,
-        address _controller
+        address _controller,
+        address _priceOracle
     ) external initializer {
         __ERC20_init(_iTokenName, _iTokenSymbol);
         __ReentrancyGuard_init();
         controller = IController(_controller);
+        priceOracle = IPriceOracle(_priceOracle);
     }
 
     function deposit(
         address _asset,
         uint256 _amount
-    ) external nonReentrant returns (uint256 shares) {
-        require(isSupportedAsset[_asset], "Asset is not supported");
+    ) external nonReentrant {
         require(_amount > 0, "Amount must be greater than 0");
-
-        uint256 assetDecimals = Helpers.getDecimals(_asset);
-        require((shares = previewDeposit(_amount.scaleBy(18, assetDecimals))) != 0, "ZERO_SHARES");
         
-        if(IERC20Upgradeable(_asset).balanceOf(address(this)) == 0) allAssets.push(_asset);
+        uint256 assetDecimals = Helpers.getDecimals(_asset);
 
-        // deposit user funds to the controller
-        controller.depositUSD(msg.sender, _asset, _amount);
+        uint256 shares = previewDeposit(_amount.scaleBy(18, assetDecimals));
+        require(shares != 0, "ZERO_SHARES");
+        
+        if(_checkBalance(_asset) == 0) allAssets.push(_asset);
+
+        IERC20Upgradeable(_asset).transferFrom(msg.sender, address(this), _amount);
 
         _mint(msg.sender, shares);
 
@@ -150,13 +156,10 @@ contract IUSD is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
     {
         IERC20Upgradeable asset = IERC20Upgradeable(_asset);
         balance = asset.balanceOf(address(this));
-        // todo: related to Strategies
-        /* for (uint256 i = 0; i < allStrategies.length; i++) {
-            IStrategy strategy = IStrategy(allStrategies[i]);
-            if (strategy.supportsAsset(_asset)) {
-                balance = balance.add(strategy.checkBalance(_asset));
-            }
-        } */
+
+        for (uint256 i = 0; i < allStrategies.length; i++) {
+            balance = balance.add(controller.balanceOf(allStrategies[i], _asset));
+        }
     }
 
     function convertToShares(uint256 _amount) internal view returns (uint256) {
@@ -172,11 +175,13 @@ contract IUSD is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
 
     function totalAssets() internal view returns (uint256 totalBalance) {
         for (uint256 i = 0; i < allAssets.length; i++) {
-            uint256 assetDecimals = Helpers.getDecimals(allAssets[i]);
-            uint256 balance = IERC20Upgradeable(allAssets[i]).balanceOf(address(this));
-            totalBalance = totalBalance.add(
-                balance.scaleBy(18, assetDecimals)
+            (uint256 price, uint256 priceDecimal) = IPriceOracle(priceOracle).getPrice(allAssets[i]);
+            uint256 balance = _checkBalance(allAssets[i]);
+            uint256 priceAdjustedBalance = balance.mulTruncateScale(
+                price.scaleBy(18, priceDecimal), // Oracles have 8 decimal precision
+                10**Helpers.getDecimals(allAssets[i])
             );
+            totalBalance = totalBalance.add(priceAdjustedBalance);
         }
     }
 
@@ -186,17 +191,6 @@ contract IUSD is Initializable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
 
     function previewWithdraw(uint256 _shares) public view returns (uint256) {
         return convertToAssets(_shares);
-    }
-    /**
-     * @dev Add a supported asset to the contract, i.e. one that can be to mint iUSD.
-     * @param _asset Address of asset
-     */
-    function supportAsset(address _asset) external {
-        require(!isSupportedAsset[_asset], "Asset already supported");
-
-        isSupportedAsset[_asset] = true;
-
-        emit AssetSupported(_asset);
     }
 
     /**
