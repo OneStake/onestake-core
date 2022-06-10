@@ -7,4 +7,9 @@ interface IController {
         address _asset,
         uint256 _amount
     ) external;
+
+    function balanceOf(
+        address _strategy, 
+        address _token
+    ) external view returns (uint256);
 }
