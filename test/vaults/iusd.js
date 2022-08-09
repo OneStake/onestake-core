@@ -1,10 +1,15 @@
 const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 
-const { parseEther, parseUnits } = ethers.utils;
+const {
+    parseUnits,
+    daiUnits,
+    usdtUnits,
+    usdcUnits
+} = require("../helpers");
 
 describe("iUSD Vault contract", function () {
-    let iusd;
+    let controller, iusd;
     let mockDAI, mockUSDT, mockUSDC;
     let deployer, tokenOwner, user1, user2, user3;
 
@@ -12,10 +17,15 @@ describe("iUSD Vault contract", function () {
 
     before(async () => {
         [deployer, tokenOwner, user1, user2, user3] = await ethers.getSigners();
-        const IUSD = await ethers.getContractFactory("IUSD");
-        iusd = await upgrades.deployProxy(IUSD, ["iUSD Token", "iUSD"]);
-        await iusd.deployed();
 
+        const Controller = await ethers.getContractFactory("Controller");
+        controller = await (await upgrades.deployProxy(Controller, [])).deployed();
+
+        const IUSD = await ethers.getContractFactory("IUSD");
+        iusd = await upgrades.deployProxy(IUSD, ["iUSD Token", "iUSD", controller.address]);
+
+        await controller.setUSDVault(iusd.address);
+        
         const MockDAI = await ethers.getContractFactory("MockDAI");
         mockDAI = await MockDAI.deploy();
         await mockDAI.deployed();
@@ -28,9 +38,9 @@ describe("iUSD Vault contract", function () {
         mockUSDC = await MockUSDC.deploy();
         await mockUSDC.deployed();
 
-        await mockDAI.connect(user1).mint(parseUnits("1000", 18));
-        await mockUSDT.connect(user2).mint(parseUnits("1000", 6));
-        await mockUSDC.connect(user3).mint(parseUnits("1000", 6));
+        await mockDAI.connect(user1).mint(daiUnits("1000"));
+        await mockUSDT.connect(user2).mint(usdtUnits("1000"));
+        await mockUSDC.connect(user3).mint(usdcUnits("1000"));
     });
 
     describe("Initialize", () => {
@@ -64,7 +74,7 @@ describe("iUSD Vault contract", function () {
         it("User1 deposits successfully", async () => {
             await mockDAI
                 .connect(user1)
-                .approve(iusd.address, approvalAmount);
+                .approve(controller.address, approvalAmount);
 
             await iusd
                 .connect(user1)
@@ -78,7 +88,7 @@ describe("iUSD Vault contract", function () {
             await iusd.supportAsset(mockUSDT.address);
             await mockUSDT
                 .connect(user2)
-                .approve(iusd.address, approvalAmount);
+                .approve(controller.address, approvalAmount);
 
             await iusd
                 .connect(user2)
@@ -92,7 +102,7 @@ describe("iUSD Vault contract", function () {
             await iusd.supportAsset(mockUSDC.address);
             await mockUSDC
                 .connect(user3)
-                .approve(iusd.address, approvalAmount);
+                .approve(controller.address, approvalAmount);
 
             await iusd
                 .connect(user3)
